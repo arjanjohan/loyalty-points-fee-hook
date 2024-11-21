@@ -11,9 +11,17 @@ The Loyalty Points Fee Hook is a Uniswap V4 hook that tracks of the volume trade
 
 ## Instructions
 
-To get started with mini-dao, follow these steps:
+// todo
 
 ## Next steps
+
+I will implement first a basic version of the hook, then keep adding more sophisticated features along the way.
+- Hook that awards points for amount of input tokens (ignoring token prices)
+- Calculate a uniform price for points based on TOKEN/ETH or TOKEN/USD price
+- Fixed discount if points > threshold
+- Discount based on amount of points
+- Points expire after x blocks have passed
+- 
 
 ## Links
 - [Deployed Hook Contract]()
