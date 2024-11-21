@@ -1,66 +1,23 @@
-## Foundry
+## Loyalty Points Fee Hook
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+The Loyalty Points Fee Hook is a Uniswap V4 hook that tracks of the volume traded and LP provided by users. Users are awarded points, which can give a discount on trading fees in pools with this hook attached.
 
-Foundry consists of:
+⚙️ Built using Solidity, Uniswap and Foundry
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- 🌟 **Earn Points**: Earn loyalty points by trading in the pool or providing liquidity. Higher gas prices mean more points earned per transaction.
+- 💰 **Dynamic Fees**: Get discounted trading fees based on your points balance. The more points you have, the lower your fees.
+- ⏰ **Stay Active**: Points expire over time unless you remain active in the pool through trading or liquidity provision.
+- ⛽ **Gas Bonus**: Earn bonus points during high gas periods to reward users who help maintain pool activity when network is congested.
 
-## Documentation
+## Instructions
 
-https://book.getfoundry.sh/
+To get started with mini-dao, follow these steps:
 
-## Usage
+## Next steps
 
-### Build
+## Links
+- [Deployed Hook Contract]()
+- [Demo video]()
 
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+## Team 
+- [arjanjohan](https://x.com/arjanjohan)
