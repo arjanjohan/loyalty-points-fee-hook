@@ -48,7 +48,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
         // Set gas price = 10 gwei and deploy our hook
         vm.txGasPrice(10 gwei);
-        deployCodeTo("LoyaltyPointsFeeHook.sol", abi.encode(manager), hookAddress);
+        deployCodeTo("LoyaltyPointsFeeHook.sol", abi.encode(manager, 5000, 2000), hookAddress);
         hook = LoyaltyPointsFeeHook(hookAddress);
 
         // Initialize a pool

@@ -13,16 +13,24 @@ import {Currency} from "v4-core/types/Currency.sol";
 contract LoyaltyPointsFeeHook is BaseHook {
     using LPFeeLibrary for uint24;
 
-    // The default base fees we will charge
-    uint24 public constant BASE_FEE = 5000; // denominated in pips (one-hundredth bps) 0.5%
+    uint24 public baseFee;
+    uint256 public expirationBlocks;
 
-    uint256 public constant POINTS_EXPIRATION_BLOCKS = 2000;
 
     // Error if the pool is not using a dynamic fee
     error MustUseDynamicFee();
 
+    constructor(IPoolManager _poolManager, address _curveContractAddress) BaseHook(_poolManager) {
+        _curveContract = IUniswapCurve(_curveContractAddress);
+    }
+
+
     // Initialize BaseHook parent contract in the constructor
-    constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
+    constructor(IPoolManager _poolManager, uint24 _baseFee, uint256 _expirationBlocks) BaseHook(_poolManager) {
+        baseFee = _baseFee;
+        expirationBlocks = _expirationBlocks;
+        
+    }
 
     // mapping of address to points
     mapping(address => uint256) public points;
@@ -67,8 +75,9 @@ contract LoyaltyPointsFeeHook is BaseHook {
         onlyPoolManager
         returns (bytes4, BeforeSwapDelta, uint24)
     {   
-        // Reset points if user has not been active for a while
-        if (block.number - lastActivityBlock[msg.sender] > POINTS_EXPIRATION_BLOCKS) {
+        // Reset points if user has not been active for the last POINTS_EXPIRATION_BLOCKS blocks
+        if (block.number - lastActivityBlock[msg.sender] > expirationBlocks) {
+            totalPoints -= points[msg.sender];
             points[msg.sender] = 0;
         }
 
@@ -117,10 +126,10 @@ contract LoyaltyPointsFeeHook is BaseHook {
 
         // if fees above threshold, give discount
         if (userPoints > 200) {
-            return BASE_FEE / 2;
+            return baseFee / 2;
         }
 
-        return BASE_FEE;
+        return baseFee;
     }
 
     function calculatePoints(int256 amountIn, Currency tokenIn) internal {
@@ -129,7 +138,3 @@ contract LoyaltyPointsFeeHook is BaseHook {
         totalPoints += uint256(amountIn);
     }
 }
-
-// todo:
-// high gas price => earn more points
-// points expire if unused (like in airline)
