@@ -19,6 +19,7 @@ import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol
 
 import "forge-std/console.sol";
 import {LoyaltyPointsFeeHook} from "../src/LoyaltyPointsFeeHook.sol";
+import {Stylus} from "../src/Stylus.sol";
 
 contract TestLoyaltyPointsFeeHook is Test, Deployers {
     using CurrencyLibrary for Currency;
@@ -30,8 +31,6 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
     LoyaltyPointsFeeHook hook;
 
-
-
     function setUp() public {
         // Deploy v4-core
         deployFreshManagerAndRouters();
@@ -40,19 +39,17 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         deployMintAndApprove2Currencies();
 
         // Deploy our hook with the proper flags
-        address hookAddress = address(
-            uint160(
-            Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG
-            )
-        );
+        address hookAddress =
+            address(uint160(Hooks.BEFORE_INITIALIZE_FLAG | Hooks.BEFORE_SWAP_FLAG | Hooks.AFTER_SWAP_FLAG));
 
         // Set gas price = 10 gwei and deploy our hook
         vm.txGasPrice(10 gwei);
-        deployCodeTo("LoyaltyPointsFeeHook.sol", abi.encode(manager, 5000, 2000), hookAddress);
+        address stylusAddress = address(new Stylus(5000, 2000));
+        deployCodeTo("LoyaltyPointsFeeHook.sol", abi.encode(manager, stylusAddress), hookAddress);
         hook = LoyaltyPointsFeeHook(hookAddress);
 
         // Initialize a pool
-        (key, ) = initPool(
+        (key,) = initPool(
             currency0,
             currency1,
             hook,
@@ -74,7 +71,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
     }
 
     function test_pointsCollectedOnZeroForOneSwapNegative() public {
-        uint256 initialPoints = hook.points(address(this));
+        uint256 initialPoints = hook.getUserPoints(address(this));
         uint256 initialToken1Balance = currency1.balanceOf(address(this));
         // Set user address in hook data
         bytes memory hookData = abi.encode(address(this));
@@ -87,13 +84,10 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
                 amountSpecified: -0.001 ether, // Exact input for output swap
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
-            PoolSwapTest.TestSettings({
-                takeClaims: false,
-                settleUsingBurn: false
-            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             hookData
         );
-        uint256 pointsAfterFirstSwap = hook.points(address(this));
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
         uint256 totalPointsAfterFirstSwap = hook.getTotalPoints();
 
         uint256 token1BalanceAfterFirstSwap = currency1.balanceOf(address(this));
@@ -107,10 +101,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
                 amountSpecified: -0.001 ether, // Exact input for output swap
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
-            PoolSwapTest.TestSettings({
-                takeClaims: false,
-                settleUsingBurn: false
-            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             hookData
         );
 
@@ -131,10 +122,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
                 amountSpecified: -0.001 ether, // Exact input for output swap
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
-            PoolSwapTest.TestSettings({
-                takeClaims: false,
-                settleUsingBurn: false
-            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             hookData
         );
 
@@ -143,17 +131,13 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
         // The third swap should return the same amount as the first, since points have expired
         assertApproxEqRel(thirdSwapTokenOutput, firstSwapTokenOutput, 0.001e18);
-        
     }
 
-
     function test_pointsCollectedOnZeroForOneSwapPositive() public {
-        uint256 pointsBalanceOriginal = hook.points(address(this));
+        uint256 pointsBalanceOriginal = hook.getUserPoints(address(this));
 
         // Set user address in hook data
         bytes memory hookData = abi.encode(address(this));
-
-  
 
         // Now we swap
         // We will swap 0.001 ether for tokens
@@ -165,16 +149,13 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
                 amountSpecified: 0.001 ether, // Exact output for input swap
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
-            PoolSwapTest.TestSettings({
-                takeClaims: false,
-                settleUsingBurn: false
-            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             hookData
         );
-        uint256 pointsBalanceAfterSwap = hook.points(address(this));
+        uint256 pointsBalanceAfterSwap = hook.getUserPoints(address(this));
         uint256 totalPoints = hook.getTotalPoints();
-        assertEq(totalPoints, 1005035175979902);
-        
+        uint256 EXPECTED_POINTS = 1005035175979902;
+        assertEq(totalPoints, EXPECTED_POINTS);
+        assertEq(pointsBalanceAfterSwap, pointsBalanceOriginal + EXPECTED_POINTS);
     }
-
 }

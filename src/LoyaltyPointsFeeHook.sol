@@ -9,37 +9,27 @@ import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/types/BeforeSwapDelta.sol";
 import {Currency} from "v4-core/types/Currency.sol";
+import {IStylus} from "./interfaces/IStylus.sol";
 
 contract LoyaltyPointsFeeHook is BaseHook {
     using LPFeeLibrary for uint24;
 
-    uint24 public baseFee;
-    uint256 public expirationBlocks;
-
+    IStylus stylusContract;
 
     // Error if the pool is not using a dynamic fee
     error MustUseDynamicFee();
 
-    constructor(IPoolManager _poolManager, address _curveContractAddress) BaseHook(_poolManager) {
-        _curveContract = IUniswapCurve(_curveContractAddress);
-    }
-
-
     // Initialize BaseHook parent contract in the constructor
-    constructor(IPoolManager _poolManager, uint24 _baseFee, uint256 _expirationBlocks) BaseHook(_poolManager) {
-        baseFee = _baseFee;
-        expirationBlocks = _expirationBlocks;
-        
+    constructor(IPoolManager _poolManager, address _stylusContractAddress) BaseHook(_poolManager) {
+        stylusContract = IStylus(_stylusContractAddress);
     }
-
-    // mapping of address to points
-    mapping(address => uint256) public points;
-    // mapping of address to last activity block
-    mapping(address => uint256) public lastActivityBlock;
-    uint256 totalPoints;
 
     function getTotalPoints() public view returns (uint256) {
-        return totalPoints;
+        return stylusContract.getTotalPoints();
+    }
+
+    function getUserPoints(address user) public view returns (uint256) {
+        return stylusContract.getUserPoints(user);
     }
 
     // Required override function for BaseHook to let the PoolManager know which hooks are implemented
@@ -69,19 +59,15 @@ contract LoyaltyPointsFeeHook is BaseHook {
         return this.beforeInitialize.selector;
     }
 
-    function beforeSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata, bytes calldata)
+    function beforeSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata swapParams, bytes calldata hookData)
         external
         override
         onlyPoolManager
         returns (bytes4, BeforeSwapDelta, uint24)
-    {   
-        // Reset points if user has not been active for the last POINTS_EXPIRATION_BLOCKS blocks
-        if (block.number - lastActivityBlock[msg.sender] > expirationBlocks) {
-            totalPoints -= points[msg.sender];
-            points[msg.sender] = 0;
-        }
+    {
 
-        uint24 fee = getFee();
+        address user = abi.decode(hookData, (address));
+        uint24 fee = stylusContract.getFee(user);
         uint24 feeWithFlag = fee | LPFeeLibrary.OVERRIDE_FEE_FLAG;
         return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, feeWithFlag);
     }
@@ -91,50 +77,39 @@ contract LoyaltyPointsFeeHook is BaseHook {
         PoolKey calldata key,
         IPoolManager.SwapParams calldata swapParams,
         BalanceDelta delta,
-        bytes calldata
+        bytes calldata hookData
     ) external override returns (bytes4, int128) {
-
-
         // // If this is not an ETH-TOKEN pool with this hook attached, ignore
         // if (!key.currency0.isAddressZero()) return (this.afterSwap.selector, 0);
 
-        if (swapParams.zeroForOne) {
-            if (swapParams.amountSpecified < 0) {
-                // token0 is being sold, amountSpecified is exact input
-                calculatePoints(-swapParams.amountSpecified, key.currency0);
-            } else {
-                // token1 is being sold, amountSpecified is exact output
-                calculatePoints(-delta.amount0(), key.currency0);
-            }
-        } else {
-            if (swapParams.amountSpecified > 0) {
-                // token1 is being sold, amountSpecified is exact input
-                calculatePoints(swapParams.amountSpecified, key.currency1);
-            } else {
-                // token1 is being sold, amountSpecified is exact output
-                // TODO Test if amount is correct
-                calculatePoints(delta.amount0(), key.currency1);
-            }
-        }
-        lastActivityBlock[msg.sender] = block.number;
+
+
+        // // TODO: When it's not an ETH-TOKEN pool, fetch token/ETH price
+        // if (!key.currency0.isAddressZero()) {
+        //     // get the input currency
+        //     Currency currencyIn;
+        //     int256 amountIn;
+        //     if (swapParams.zeroForOne) {
+        //         // token0 is being sold, amountSpecified is exact input
+        //         currencyIn = key.currency0;
+        //         amountIn = swapParams.amountSpecified;
+        //     } else { 
+        //         // token1 is being sold, amountSpecified is exact output
+        //         currencyIn = key.currency1;
+        //         amountIn = delta.amount0();
+        //     }
+        // }
+
+
+
+
+
         
+        address user = abi.decode(hookData, (address));
+
+        stylusContract.updatePoints(user, swapParams.zeroForOne, swapParams.amountSpecified, delta.amount0(), Currency.unwrap(key.currency0), Currency.unwrap(key.currency1));
+
         return (this.afterSwap.selector, 0);
     }
 
-    function getFee() internal view returns (uint24) {
-        uint256 userPoints = points[msg.sender];
-
-        // if fees above threshold, give discount
-        if (userPoints > 200) {
-            return baseFee / 2;
-        }
-
-        return baseFee;
-    }
-
-    function calculatePoints(int256 amountIn, Currency tokenIn) internal {
-        // TODO: convert amountIn to ETH for a more fair points calculation
-        points[msg.sender] += uint256(amountIn);
-        totalPoints += uint256(amountIn);
-    }
 }
