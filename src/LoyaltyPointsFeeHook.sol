@@ -79,36 +79,11 @@ contract LoyaltyPointsFeeHook is BaseHook {
         BalanceDelta delta,
         bytes calldata hookData
     ) external override returns (bytes4, int128) {
-        // // If this is not an ETH-TOKEN pool with this hook attached, ignore
-        // if (!key.currency0.isAddressZero()) return (this.afterSwap.selector, 0);
-
-
-
-        // // TODO: When it's not an ETH-TOKEN pool, fetch token/ETH price
-        // if (!key.currency0.isAddressZero()) {
-        //     // get the input currency
-        //     Currency currencyIn;
-        //     int256 amountIn;
-        //     if (swapParams.zeroForOne) {
-        //         // token0 is being sold, amountSpecified is exact input
-        //         currencyIn = key.currency0;
-        //         amountIn = swapParams.amountSpecified;
-        //     } else { 
-        //         // token1 is being sold, amountSpecified is exact output
-        //         currencyIn = key.currency1;
-        //         amountIn = delta.amount0();
-        //     }
-        // }
-
-
-
-
-
+        // // If this is not an ETH-TOKEN pool with this hook attached, dont award points
+        if (!key.currency0.isAddressZero()) return (this.afterSwap.selector, 0);
         
         address user = abi.decode(hookData, (address));
-
         stylusContract.updatePoints(user, swapParams.zeroForOne, swapParams.amountSpecified, delta.amount0(), Currency.unwrap(key.currency0), Currency.unwrap(key.currency1));
-
         return (this.afterSwap.selector, 0);
     }
 

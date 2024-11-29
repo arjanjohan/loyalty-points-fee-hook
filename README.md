@@ -2,7 +2,7 @@
 
 The Loyalty Points Fee Hook is a Uniswap V4 hook that tracks of the volume traded and LP provided by users. Users are awarded points, which can give a discount on trading fees in pools with this hook attached.
 
-⚙️ Built using Solidity, Uniswap and Foundry
+⚙️ Built using Solidity, Arbitrum Stylus, Uniswap V4 and Foundry
 
 - 🌟 **Earn Points**: Earn loyalty points by trading in the pool or providing liquidity. Higher gas prices mean more points earned per transaction.
 - 💰 **Dynamic Fees**: Get discounted trading fees based on your points balance. The more points you have, the lower your fees.
@@ -17,15 +17,15 @@ The Loyalty Points Fee Hook is a Uniswap V4 hook that tracks of the volume trade
 
 This hook is built on top of [Uniswap V4 Template](https://github.com/uniswapfoundation/v4-template).
 
-
 1. The Loyalty Points Fee hook [LoyaltyPointsFeeHook.sol](src/LoyaltyPointsFeeHook.sol) uses:
     - `constructor` takes _baseFee and _expirationBlocks as arguments to determine the base fee (without discount) and how many blocks of inactivity will makes points expire.
-    - `beforeSwap()` hook first checks the users most recent activity. If the user has been inactive too long, his points are reset. Then it calculates the fee with via the implementation written in [Stylus](TODO),
+    - `beforeSwap()` hook first checks the users most recent activity. If the user has been inactive too long, his points are reset. Then it calculates the fee with via the [implementation written in Stylus](TODO),
     - `afterSwap()` hook calculates the amount of points earned with the swap,
     <!-- - `beforeAddLiquidity()` hook, -->
     <!-- - `beforeRemoveLiquidity()` hook, -->
-    - `getHookPermissions()` function.
+    - `getHookPermissions()` function.  
 2. The test template [LoyaltyPointsFeeHook.t.sol](test/LoyaltyPointsFeeHook.t.sol) preconfigures the v4 pool manager, test tokens, and test liquidity.
+3. [IStylus.sol](src/interface/IStylus.sol) is the interface for the [Stylus contract](TODO). I have also written an implementation of this in Solidity in [Stylus.sol](src/Stylus.sol).
 
 ## Next steps
 
