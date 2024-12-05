@@ -23,12 +23,32 @@ import {LoyaltyPointsFeeHook} from "../src/LoyaltyPointsFeeHook.sol";
 import {Stylus} from "../src/Stylus.sol";
 
 contract TestLoyaltyPointsFeeHook is Test, Deployers {
+
+
+    uint256 constant BASE_FEE = 5000; // 0.5% fee
+    uint256 constant HIGH_DISCOUNT = 5000; // 50% discount
+    uint256 constant MEDIUM_DISCOUNT = 2500; // 25% discount
+    uint256 constant LOW_DISCOUNT = 1000; // 10% discount
+
+    string constant INITIAL_POINTS_ERROR = "Initial points should be 0";
+    string constant POINTS_COLLECTED_ERROR = "Points collected should match swap amount";
+    string constant SECOND_SWAP_HIGHER_OUTPUT_ERROR = "Second swap should have higher output due to fee discount";
+    string constant SWAP_OUTPUT_RATIO_ERROR = "Swap outputs should have expected ratio based on fee discount";
+    string constant TOKEN_BALANCE_ERROR = "Token balance change should match swap amount";
+    string constant POINTS_EXPIRED_ERROR = "Points should be expired, outputs should match";
+    string constant NO_POINTS_COLLECTED_ERROR = "No points should be collected for ERC20-ERC20 swap";
+
+
+
+
+
+
+
     using CurrencyLibrary for Currency;
 
     MockERC20 token;
 
     Currency ethCurrency = Currency.wrap(address(0));
-    Currency tokenCurrency;
 
     LoyaltyPointsFeeHook hook;
     
@@ -67,13 +87,13 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
             IPoolManager.ModifyLiquidityParams({
                 tickLower: -60,
                 tickUpper: 60,
-                liquidityDelta: 10 ether,
+                liquidityDelta: 100 ether,
                 salt: bytes32(0)
             }),
             ZERO_BYTES
         );
 
-        uint256 ethToAdd = 10 ether;
+        uint256 ethToAdd = 100 ether;
 
         // Initialize eth-token pool
         (ethTokenKey,) = initPool(
@@ -97,35 +117,40 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         );
     }
 
-    function test_pointsCollectedOnZeroForOneSwapNegative() public {
+    function testPointsCollectedOnZeroForOneSwapExactInput() public {
         uint256 initialPoints = hook.getUserPoints(address(this));
         uint256 initialToken1Balance = currency1.balanceOf(address(this));
+        uint256 initialEthBalance = address(this).balance;
+
+        assertEq(initialPoints, 0, INITIAL_POINTS_ERROR);
+        
         // Set user address in hook data
         bytes memory hookData = abi.encode(address(this));
 
+        uint256 swapAmount = 0.001 ether;
+
         // First swap - baseline with no points discount
-        swapRouter.swap{value: 0.001 ether}(
+        swapRouter.swap{value: swapAmount}(
             ethTokenKey,
             IPoolManager.SwapParams({
                 zeroForOne: true,
-                amountSpecified: -0.001 ether, // Exact input for output swap
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             hookData
         );
-        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
-        uint256 totalPointsAfterFirstSwap = hook.getTotalPoints();
-
         uint256 token1BalanceAfterFirstSwap = currency1.balanceOf(address(this));
         uint256 firstSwapTokenOutput = token1BalanceAfterFirstSwap - initialToken1Balance;
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        assertEq(pointsAfterFirstSwap, swapAmount, POINTS_COLLECTED_ERROR);
 
         // Second swap - should have fee discount from accumulated points
-        swapRouter.swap{value: 0.001 ether}(
+        swapRouter.swap{value: swapAmount}(
             ethTokenKey,
             IPoolManager.SwapParams({
                 zeroForOne: true,
-                amountSpecified: -0.001 ether, // Exact input for output swap
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
@@ -135,18 +160,231 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         uint256 token1BalanceAfterSecondSwap = currency1.balanceOf(address(this));
         uint256 secondSwapTokenOutput = token1BalanceAfterSecondSwap - token1BalanceAfterFirstSwap;
 
+        assertEq(secondSwapTokenOutput > firstSwapTokenOutput, true, SECOND_SWAP_HIGHER_OUTPUT_ERROR);
+        assertApproxEqRel(secondSwapTokenOutput, firstSwapTokenOutput * (10000 + (BASE_FEE * HIGH_DISCOUNT / (1000*1000)))/ 10000, 0.001e18, SWAP_OUTPUT_RATIO_ERROR);
+    }
+
+
+    function testPointsCollectedOnOneForZeroSwapExactInput() public {
+        uint256 initialPoints = hook.getUserPoints(address(this));
+        assertEq(initialPoints, 0, INITIAL_POINTS_ERROR);
+        uint256 initialToken1Balance = currency1.balanceOf(address(this));
+        uint256 initialEthBalance = address(this).balance;
+        
+        // Set user address in hook data
+        bytes memory hookData = abi.encode(address(this));
+
+        uint256 swapAmount = 0.001 ether;
+
+        // First swap - baseline with no points discount
+        swapRouter.swap(
+            ethTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: false,
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
+                sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+
+        uint256 afterToken1Balance = currency1.balanceOf(address(this));
+        uint256 firstSwapTokenOutput = initialToken1Balance - afterToken1Balance;
+        assertEq(initialToken1Balance - afterToken1Balance, swapAmount, TOKEN_BALANCE_ERROR);
+        uint256 firstSwapEthBalance = address(this).balance;
+
+        uint256 ethOutputFirstSwap = firstSwapEthBalance - initialEthBalance;
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        assertEq(pointsAfterFirstSwap, ethOutputFirstSwap, POINTS_COLLECTED_ERROR);
+
+        // Second swap - should have fee discount from accumulated points
+        swapRouter.swap(
+            ethTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: false,
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
+                sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+
+        uint256 secondSwapEthBalance = address(this).balance;
+
+        uint256 ethOutputSecondSwap = secondSwapEthBalance - firstSwapEthBalance;
+
+        assertEq(ethOutputSecondSwap > ethOutputFirstSwap, true, SECOND_SWAP_HIGHER_OUTPUT_ERROR);
+        assertApproxEqRel(ethOutputSecondSwap, ethOutputFirstSwap * (10000 + (BASE_FEE * HIGH_DISCOUNT / (1000*1000)))/ 10000, 0.002e18, SWAP_OUTPUT_RATIO_ERROR);
+    }
+
+    function testPointsCollectedOnOneForZeroSwapExactOutput() public {
+        uint256 initialPoints = hook.getUserPoints(address(this));
+        assertEq(initialPoints, 0, INITIAL_POINTS_ERROR);
+        uint256 initialToken1Balance = currency1.balanceOf(address(this));
+        uint256 initialEthBalance = address(this).balance;
+        
+        // Set user address in hook data
+        bytes memory hookData = abi.encode(address(this));
+
+        uint256 swapAmount = 0.001 ether;
+
+        // First swap - baseline with no points discount
+        swapRouter.swap(
+            ethTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: false,
+                amountSpecified: int256(swapAmount), // Exact output for input swap
+                sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+
+        uint256 afterToken1Balance = currency1.balanceOf(address(this));
+        uint256 firstSwapTokenInput = initialToken1Balance - afterToken1Balance;
+        uint256 afterEthBalance = address(this).balance;
+
+        uint256 ethOutputFirstSwap = afterEthBalance - initialEthBalance;
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        assertEq(pointsAfterFirstSwap, ethOutputFirstSwap, POINTS_COLLECTED_ERROR);
+
+        // Second swap - should have fee discount from accumulated points
+        swapRouter.swap(
+            ethTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: false,
+                amountSpecified: int256(swapAmount), // Exact output for input swap
+                sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+
+        uint256 token1BalanceAfterSecondSwap = currency1.balanceOf(address(this));
+        uint256 secondSwapTokenInput = afterToken1Balance - token1BalanceAfterSecondSwap;
+
+        assertEq(secondSwapTokenInput < firstSwapTokenInput, true, SECOND_SWAP_HIGHER_OUTPUT_ERROR);
+        assertApproxEqRel(firstSwapTokenInput, secondSwapTokenInput * (10000 + (BASE_FEE * HIGH_DISCOUNT / (1000*1000)))/ 10000, 0.001e18, SWAP_OUTPUT_RATIO_ERROR);
+    }
+
+    function testPointsCollectedOnZeroForOneSwapExactOutput() public {
+        // Points should equal the amount of eth input
+        uint256 ethInputValue = 0.001005125638191961 ether;
+        
+        
+        uint256 initialPoints = hook.getUserPoints(address(this));
+        assertEq(initialPoints, 0, INITIAL_POINTS_ERROR);
+        uint256 initialToken1Balance = currency1.balanceOf(address(this));
+        uint256 initialEthBalance = address(this).balance;
+        
+        // Set user address in hook data
+        bytes memory hookData = abi.encode(address(this));
+
+        uint256 swapAmount = 0.001 ether;
+
+        // First swap - baseline with no points discount
+        swapRouter.swap{value: ethInputValue}(
+            ethTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: true,
+                amountSpecified: int256(swapAmount), // Exact output for input swap
+                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+
+        uint256 afterToken1Balance = currency1.balanceOf(address(this));
+        uint256 firstSwapTokenOutput = afterToken1Balance - initialToken1Balance;
+        assertEq(afterToken1Balance - initialToken1Balance, swapAmount, TOKEN_BALANCE_ERROR);
+        uint256 afterFirstSwapEthBalance = address(this).balance;
+
+        uint256 ethInputFirstSwap = initialEthBalance - afterFirstSwapEthBalance;
+        assertEq(ethInputFirstSwap, ethInputValue, "ETH input should match expected value");
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        assertEq(pointsAfterFirstSwap, ethInputFirstSwap, POINTS_COLLECTED_ERROR);
+
+        // Second swap - should have fee discount from accumulated points
+        swapRouter.swap{value: ethInputValue}(
+            ethTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: true,
+                amountSpecified: int256(swapAmount), // Exact output for input swap
+                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+        uint256 afterSecondSwapEthBalance = address(this).balance;
+        uint256 ethInputSecondSwap = afterFirstSwapEthBalance - afterSecondSwapEthBalance;
+
+        uint256 pointsAfterSecondSwap = hook.getUserPoints(address(this));
+        assertEq(pointsAfterSecondSwap, ethInputFirstSwap + ethInputSecondSwap, POINTS_COLLECTED_ERROR);
+
+        assertEq(ethInputFirstSwap > ethInputSecondSwap, true, SECOND_SWAP_HIGHER_OUTPUT_ERROR);
+        assertApproxEqRel(ethInputFirstSwap, ethInputSecondSwap * (10000 + (BASE_FEE * HIGH_DISCOUNT / (1000*1000)))/ 10000, 0.001e18, SWAP_OUTPUT_RATIO_ERROR);
+    }
+
+
+    function testPointsExpired() public {
+        uint256 initialPoints = hook.getUserPoints(address(this));
+        uint256 initialToken1Balance = currency1.balanceOf(address(this));
+        uint256 initialEthBalance = address(this).balance;
+        // Set user address in hook data
+        bytes memory hookData = abi.encode(address(this));
+
+        uint256 swapAmount = 0.001 ether;
+
+        // First swap - baseline with no points discount
+        swapRouter.swap{value: swapAmount}(
+            ethTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: true,
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
+                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        uint256 totalPointsAfterFirstSwap = hook.getTotalPoints();
+
+        uint256 token1BalanceAfterFirstSwap = currency1.balanceOf(address(this));
+        uint256 ethBalanceAfterFirstSwap = address(this).balance;
+        uint256 firstSwapTokenOutput = token1BalanceAfterFirstSwap - initialToken1Balance;
+        assertEq(initialEthBalance - ethBalanceAfterFirstSwap, swapAmount, TOKEN_BALANCE_ERROR);
+
+        // Second swap - should have fee discount from accumulated points
+        swapRouter.swap{value: swapAmount}(
+            ethTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: true,
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
+                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+
+        uint256 token1BalanceAfterSecondSwap = currency1.balanceOf(address(this));
+        uint256 ethBalanceAfterSecondSwap = address(this).balance;
+        uint256 secondSwapTokenOutput = token1BalanceAfterSecondSwap - token1BalanceAfterFirstSwap;
+        assertEq(ethBalanceAfterFirstSwap - ethBalanceAfterSecondSwap, swapAmount, TOKEN_BALANCE_ERROR);
+
         // We expect to get ~0.25% more tokens on the second swap due to fee discount
-        assertApproxEqRel(secondSwapTokenOutput, firstSwapTokenOutput * 10025 / 10000, 0.001e18);
+        // Max delta of 0.001e18 to account for changing price between swaps
+        assertEq(secondSwapTokenOutput > firstSwapTokenOutput, true, SECOND_SWAP_HIGHER_OUTPUT_ERROR);
+        assertApproxEqRel(secondSwapTokenOutput, firstSwapTokenOutput * (10000 + (BASE_FEE * HIGH_DISCOUNT / (1000*1000)))/ 10000, 0.001e18, SWAP_OUTPUT_RATIO_ERROR);
 
         // Increase block by 2100 to have points expire
         vm.roll(block.number + 2100);
 
         // Third swap - points expired, should match first swap output
-        swapRouter.swap{value: 0.001 ether}(
+        swapRouter.swap{value: swapAmount}(
             ethTokenKey,
             IPoolManager.SwapParams({
                 zeroForOne: true,
-                amountSpecified: -0.001 ether, // Exact input for output swap
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
                 sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
@@ -157,32 +395,63 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         uint256 thirdSwapTokenOutput = token1BalanceAfterThirdSwap - token1BalanceAfterSecondSwap;
 
         // The third swap should return the same amount as the first, since points have expired
-        assertApproxEqRel(thirdSwapTokenOutput, firstSwapTokenOutput, 0.001e18);
+        // Max delta of 0.001e18 to account for changing price between swaps
+        assertApproxEqRel(thirdSwapTokenOutput, firstSwapTokenOutput, 0.001e18, POINTS_EXPIRED_ERROR);
     }
 
-    function test_pointsCollectedOnZeroForOneSwapPositive() public {
-        uint256 pointsBalanceOriginal = hook.getUserPoints(address(this));
 
+    // Test that no points are collected for an ERC20 to ERC20 swap
+    function testNoPointsCollectedForERC20ToERC20Swap() public {
+        uint256 initialPoints = hook.getUserPoints(address(this));
+        uint256 initialToken0Balance = currency0.balanceOf(address(this));
+        uint256 initialToken1Balance = currency1.balanceOf(address(this));
+        
         // Set user address in hook data
         bytes memory hookData = abi.encode(address(this));
 
-        // Now we swap
-        // We will swap 0.001 ether for tokens
-        // We should get 0.001 ether in points
+        uint256 swapAmount = 0.001 ether;
+        // First swap - baseline with no points discount
         swapRouter.swap(
-            ethTokenKey,
+            tokenTokenKey,
             IPoolManager.SwapParams({
-                zeroForOne: false,
-                amountSpecified: 0.001 ether, // Exact input for output swap
-                sqrtPriceLimitX96: TickMath.MAX_SQRT_PRICE - 1
+                zeroForOne: true,
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
+                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
             }),
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             hookData
         );
-        // uint256 pointsBalanceAfterSwap = hook.getUserPoints(address(this));
-        // uint256 totalPoints = hook.getTotalPoints();
-        // uint256 EXPECTED_POINTS = 1005035175979902;
-        // assertEq(totalPoints, EXPECTED_POINTS);
-        // assertEq(pointsBalanceAfterSwap, pointsBalanceOriginal + EXPECTED_POINTS);
-    }
+        
+        uint256 token1BalanceAfterFirstSwap = currency1.balanceOf(address(this));
+        uint256 firstSwapTokenOutput = token1BalanceAfterFirstSwap - initialToken1Balance;
+
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        assertEq(pointsAfterFirstSwap, initialPoints, NO_POINTS_COLLECTED_ERROR);
+        assertEq(pointsAfterFirstSwap, 0, NO_POINTS_COLLECTED_ERROR);
+
+        // Second swap - again no points discount
+        swapRouter.swap(
+            tokenTokenKey,
+            IPoolManager.SwapParams({
+                zeroForOne: true,
+                amountSpecified: -int256(swapAmount), // Exact input for output swap
+                sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            hookData
+        );
+
+        uint256 token1BalanceAfterSecondSwap = currency1.balanceOf(address(this));
+        uint256 secondSwapTokenOutput = token1BalanceAfterSecondSwap - token1BalanceAfterFirstSwap;
+        uint256 pointsAfterSecondSwap = hook.getUserPoints(address(this));
+        
+        assertEq(pointsAfterSecondSwap, initialPoints, NO_POINTS_COLLECTED_ERROR);
+        assertEq(pointsAfterSecondSwap, 0, NO_POINTS_COLLECTED_ERROR);
+
+        // The second swap should return the same amount as the first, since points have expired
+        assertApproxEqRel(secondSwapTokenOutput, firstSwapTokenOutput, 0.001e18, POINTS_EXPIRED_ERROR);
+
+        assertApproxEqRel(firstSwapTokenOutput, secondSwapTokenOutput, 0.001e18, POINTS_EXPIRED_ERROR);
+
+       }
 }

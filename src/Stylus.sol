@@ -36,9 +36,9 @@ contract Stylus is IStylus {
         expirationBlocks = _expirationBlocks;
 
         // Set default tier values - ordered from highest to lowest
-        tiers.push(Tier(3, 5000));   // Tier 1: 10000 points, 50% discount
-        tiers.push(Tier(2, 2500));    // Tier 2: 1000 points, 25% discount
-        tiers.push(Tier(1, 1000));     // Tier 3: 100 points, 10% discount
+        tiers.push(Tier(0.001 ether, 5000));   // Tier 1: 10000 points, 50% discount
+        tiers.push(Tier(0.00005 ether, 2500));    // Tier 2: 1000 points, 25% discount
+        tiers.push(Tier(0.000005 ether, 1000));     // Tier 3: 100 points, 10% discount
     }
 
     // function updateTier(uint256 tierIndex, uint256 threshold, uint24 discount) external onlyAdmin {
