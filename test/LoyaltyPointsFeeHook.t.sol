@@ -118,7 +118,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
     }
 
     function testPointsCollectedOnZeroForOneSwapExactInput() public {
-        uint256 initialPoints = hook.getUserPoints(address(this));
+        uint256 initialPoints = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         uint256 initialToken1Balance = currency1.balanceOf(address(this));
         uint256 initialEthBalance = address(this).balance;
 
@@ -142,7 +142,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         );
         uint256 token1BalanceAfterFirstSwap = currency1.balanceOf(address(this));
         uint256 firstSwapTokenOutput = token1BalanceAfterFirstSwap - initialToken1Balance;
-        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(pointsAfterFirstSwap, swapAmount, POINTS_COLLECTED_ERROR);
 
         // Second swap - should have fee discount from accumulated points
@@ -166,7 +166,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
 
     function testPointsCollectedOnOneForZeroSwapExactInput() public {
-        uint256 initialPoints = hook.getUserPoints(address(this));
+        uint256 initialPoints = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(initialPoints, 0, INITIAL_POINTS_ERROR);
         uint256 initialToken1Balance = currency1.balanceOf(address(this));
         uint256 initialEthBalance = address(this).balance;
@@ -194,7 +194,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         uint256 firstSwapEthBalance = address(this).balance;
 
         uint256 ethOutputFirstSwap = firstSwapEthBalance - initialEthBalance;
-        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(pointsAfterFirstSwap, ethOutputFirstSwap, POINTS_COLLECTED_ERROR);
 
         // Second swap - should have fee discount from accumulated points
@@ -218,7 +218,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
     }
 
     function testPointsCollectedOnOneForZeroSwapExactOutput() public {
-        uint256 initialPoints = hook.getUserPoints(address(this));
+        uint256 initialPoints = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(initialPoints, 0, INITIAL_POINTS_ERROR);
         uint256 initialToken1Balance = currency1.balanceOf(address(this));
         uint256 initialEthBalance = address(this).balance;
@@ -245,7 +245,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         uint256 afterEthBalance = address(this).balance;
 
         uint256 ethOutputFirstSwap = afterEthBalance - initialEthBalance;
-        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(pointsAfterFirstSwap, ethOutputFirstSwap, POINTS_COLLECTED_ERROR);
 
         // Second swap - should have fee discount from accumulated points
@@ -272,7 +272,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         uint256 ethInputValue = 0.001005125638191961 ether;
         
         
-        uint256 initialPoints = hook.getUserPoints(address(this));
+        uint256 initialPoints = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(initialPoints, 0, INITIAL_POINTS_ERROR);
         uint256 initialToken1Balance = currency1.balanceOf(address(this));
         uint256 initialEthBalance = address(this).balance;
@@ -301,7 +301,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
         uint256 ethInputFirstSwap = initialEthBalance - afterFirstSwapEthBalance;
         assertEq(ethInputFirstSwap, ethInputValue, "ETH input should match expected value");
-        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(pointsAfterFirstSwap, ethInputFirstSwap, POINTS_COLLECTED_ERROR);
 
         // Second swap - should have fee discount from accumulated points
@@ -318,7 +318,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         uint256 afterSecondSwapEthBalance = address(this).balance;
         uint256 ethInputSecondSwap = afterFirstSwapEthBalance - afterSecondSwapEthBalance;
 
-        uint256 pointsAfterSecondSwap = hook.getUserPoints(address(this));
+        uint256 pointsAfterSecondSwap = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(pointsAfterSecondSwap, ethInputFirstSwap + ethInputSecondSwap, POINTS_COLLECTED_ERROR);
 
         assertEq(ethInputFirstSwap > ethInputSecondSwap, true, SECOND_SWAP_HIGHER_OUTPUT_ERROR);
@@ -327,7 +327,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
 
     function testPointsExpired() public {
-        uint256 initialPoints = hook.getUserPoints(address(this));
+        uint256 initialPoints = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         uint256 initialToken1Balance = currency1.balanceOf(address(this));
         uint256 initialEthBalance = address(this).balance;
         // Set user address in hook data
@@ -346,8 +346,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             hookData
         );
-        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
-        uint256 totalPointsAfterFirstSwap = hook.getTotalPoints();
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this), Currency.unwrap(currency1));
 
         uint256 token1BalanceAfterFirstSwap = currency1.balanceOf(address(this));
         uint256 ethBalanceAfterFirstSwap = address(this).balance;
@@ -402,7 +401,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
     // Test that no points are collected for an ERC20 to ERC20 swap
     function testNoPointsCollectedForERC20ToERC20Swap() public {
-        uint256 initialPoints = hook.getUserPoints(address(this));
+        uint256 initialPoints = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         uint256 initialToken0Balance = currency0.balanceOf(address(this));
         uint256 initialToken1Balance = currency1.balanceOf(address(this));
         
@@ -425,7 +424,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
         uint256 token1BalanceAfterFirstSwap = currency1.balanceOf(address(this));
         uint256 firstSwapTokenOutput = token1BalanceAfterFirstSwap - initialToken1Balance;
 
-        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this));
+        uint256 pointsAfterFirstSwap = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         assertEq(pointsAfterFirstSwap, initialPoints, NO_POINTS_COLLECTED_ERROR);
         assertEq(pointsAfterFirstSwap, 0, NO_POINTS_COLLECTED_ERROR);
 
@@ -443,7 +442,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
         uint256 token1BalanceAfterSecondSwap = currency1.balanceOf(address(this));
         uint256 secondSwapTokenOutput = token1BalanceAfterSecondSwap - token1BalanceAfterFirstSwap;
-        uint256 pointsAfterSecondSwap = hook.getUserPoints(address(this));
+        uint256 pointsAfterSecondSwap = hook.getUserPoints(address(this), Currency.unwrap(currency1));
         
         assertEq(pointsAfterSecondSwap, initialPoints, NO_POINTS_COLLECTED_ERROR);
         assertEq(pointsAfterSecondSwap, 0, NO_POINTS_COLLECTED_ERROR);

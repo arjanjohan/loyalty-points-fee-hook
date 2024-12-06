@@ -14,24 +14,15 @@ contract Stylus is IStylus {
     Tier[] public tiers;
 
     // mapping of address to points
-    mapping(address => uint256) public points;
+    mapping(address => mapping(address => uint256)) public points;
     
     // mapping of address to last activity block
     mapping(address => uint256) public lastActivityBlock;
-    uint256 public totalPoints;
     uint24 public baseFee;
     uint256 public expirationBlocks;
 
-    address public admin;
-
-    modifier onlyAdmin() {
-        require(msg.sender == admin, "Only admin can call this function");
-        _;
-    }
-
     // Initialize BaseHook parent contract in the constructor
     constructor(uint24 _baseFee, uint256 _expirationBlocks) {
-        admin = msg.sender;
         baseFee = _baseFee;
         expirationBlocks = _expirationBlocks;
 
@@ -41,47 +32,23 @@ contract Stylus is IStylus {
         tiers.push(Tier(0.000005 ether, 1000));     // Tier 3: 100 points, 10% discount
     }
 
-    // function updateTier(uint256 tierIndex, uint256 threshold, uint24 discount) external onlyAdmin {
-    //     require(discount <= 10000, "Discount cannot exceed 100%");
-    //     require(tierIndex < tiers.length, "Invalid tier index");
-        
-    //     // Ensure thresholds maintain descending order
-    //     if (tierIndex > 0) {
-    //         require(threshold < tiers[tierIndex - 1].threshold, "Threshold must be lower than previous tier");
-    //     }
-    //     if (tierIndex < tiers.length - 1) {
-    //         require(threshold > tiers[tierIndex + 1].threshold, "Threshold must be higher than next tier");
-    //     }
 
-    //     tiers[tierIndex] = Tier(threshold, discount);
-    // }
-
-    function setAdmin(address newAdmin) external onlyAdmin {
-        require(newAdmin != address(0), "New admin cannot be zero address");
-        admin = newAdmin;
+    function getUserPoints(address user, address currency1) external view returns (uint256) {
+        return points[currency1][user];
     }
 
-    function getTotalPoints() external view returns (uint256) {
-        return totalPoints;
-    }   
-
-    function getUserPoints(address user) external view returns (uint256) {
-        return points[user];
-    }
-
-    function getFee(address user) external returns (uint24) {
+    function getFee(address user, address currency1) external returns (uint24) {
         // Reset points if user has not been active for the last POINTS_EXPIRATION_BLOCKS blocks
         if (block.number - lastActivityBlock[user] > expirationBlocks) {
-            totalPoints -= points[user];
-            points[user] = 0;
+            points[currency1][user] = 0;
         }
 
-        uint24 fee = calculateFee(user);
+        uint24 fee = calculateFee(user, currency1);
         return fee;
     }
 
-    function calculateFee(address user) internal view returns (uint24) {
-        uint256 userPoints = points[user];
+    function calculateFee(address user, address currency1) internal view returns (uint24) {
+        uint256 userPoints = points[currency1][user];
 
         // Check tiers from highest to lowest to find applicable discount
         for (uint256 i = 0; i < tiers.length; i++) {
@@ -101,10 +68,10 @@ contract Stylus is IStylus {
         if (zeroForOne) {
             if (amountSpecified < 0) {
                 // token0 is being sold, amountSpecified is exact input
-                calculatePoints(user, -amountSpecified, currency0);
+                calculatePoints(user, -amountSpecified, currency1);
             } else {
                 // token1 is being sold, amountSpecified is exact output
-                calculatePoints(user, -deltaAmount0, currency0);
+                calculatePoints(user, -deltaAmount0, currency1);
             }
         } else {
             if (amountSpecified > 0) {
@@ -120,7 +87,6 @@ contract Stylus is IStylus {
 
     function calculatePoints(address user, int256 amountIn, address tokenIn) internal {
         // TODO: convert amountIn to ETH for a more fair points calculation
-        points[user] += uint256(amountIn);
-        totalPoints += uint256(amountIn);
+        points[tokenIn][user] += uint256(amountIn);
     }
 }

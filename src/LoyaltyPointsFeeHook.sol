@@ -24,12 +24,8 @@ contract LoyaltyPointsFeeHook is BaseHook {
         stylusContract = IStylus(_stylusContractAddress);
     }
 
-    function getTotalPoints() public view returns (uint256) {
-        return stylusContract.getTotalPoints();
-    }
-
-    function getUserPoints(address user) public view returns (uint256) {
-        return stylusContract.getUserPoints(user);
+    function getUserPoints(address user, address currency1) public view returns (uint256) {
+        return stylusContract.getUserPoints(user, currency1);
     }
 
     // Required override function for BaseHook to let the PoolManager know which hooks are implemented
@@ -67,7 +63,7 @@ contract LoyaltyPointsFeeHook is BaseHook {
     {
 
         address user = abi.decode(hookData, (address));
-        uint24 fee = stylusContract.getFee(user);
+        uint24 fee = stylusContract.getFee(user, Currency.unwrap(key.currency1));
         uint24 feeWithFlag = fee | LPFeeLibrary.OVERRIDE_FEE_FLAG;
         return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, feeWithFlag);
     }
