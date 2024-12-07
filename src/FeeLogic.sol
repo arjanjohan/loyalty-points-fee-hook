@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import {IStylus} from "./interfaces/IStylus.sol";
+import {IFeeLogic} from "./interfaces/IFeeLogic.sol";
 
-contract Stylus is IStylus {
+contract FeeLogic is IFeeLogic {
 
     struct Tier {
         uint256 threshold;
@@ -18,11 +18,11 @@ contract Stylus is IStylus {
     
     // mapping of address to last activity block
     mapping(address => uint256) public lastActivityBlock;
-    uint24 public baseFee;
+    uint256 public baseFee;
     uint256 public expirationBlocks;
 
     // Initialize BaseHook parent contract in the constructor
-    constructor(uint24 _baseFee, uint256 _expirationBlocks) {
+    constructor(uint256 _baseFee, uint256 _expirationBlocks) {
         baseFee = _baseFee;
         expirationBlocks = _expirationBlocks;
 
@@ -37,17 +37,17 @@ contract Stylus is IStylus {
         return points[currency1][user];
     }
 
-    function getFee(address user, address currency1) external returns (uint24) {
+    function getFee(address user, address currency1) external returns (uint256) {
         // Reset points if user has not been active for the last POINTS_EXPIRATION_BLOCKS blocks
         if (block.number - lastActivityBlock[user] > expirationBlocks) {
             points[currency1][user] = 0;
         }
 
-        uint24 fee = calculateFee(user, currency1);
+        uint256 fee = calculateFee(user, currency1);
         return fee;
     }
 
-    function calculateFee(address user, address currency1) internal view returns (uint24) {
+    function calculateFee(address user, address currency1) internal view returns (uint256) {
         uint256 userPoints = points[currency1][user];
 
         // Check tiers from highest to lowest to find applicable discount
@@ -57,7 +57,7 @@ contract Stylus is IStylus {
                 // uint24 discountAmount = (baseFee * tiers[i].discount);
                 // require(discountAmount <= baseFee, "Discount exceeds base fee");
                 
-                return uint24(baseFee - ((baseFee * tiers[i].discount) / 10000));
+                return uint256(baseFee - ((baseFee * tiers[i].discount) / 10000));
             }
         }
 

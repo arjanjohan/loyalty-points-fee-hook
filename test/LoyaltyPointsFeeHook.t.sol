@@ -20,7 +20,7 @@ import {LiquidityAmounts} from "@uniswap/v4-core/test/utils/LiquidityAmounts.sol
 
 import "forge-std/console.sol";
 import {LoyaltyPointsFeeHook} from "../src/LoyaltyPointsFeeHook.sol";
-import {Stylus} from "../src/Stylus.sol";
+import {FeeLogic} from "../src/FeeLogic.sol";
 
 contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
@@ -68,7 +68,7 @@ contract TestLoyaltyPointsFeeHook is Test, Deployers {
 
         // Set gas price = 10 gwei and deploy our hook
         vm.txGasPrice(10 gwei);
-        address stylusAddress = address(new Stylus(5000, 2000));
+        address stylusAddress = address(new FeeLogic(5000, 2000));
         deployCodeTo("LoyaltyPointsFeeHook.sol", abi.encode(manager, stylusAddress), hookAddress);
         hook = LoyaltyPointsFeeHook(hookAddress);
 

@@ -9,19 +9,19 @@ import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/types/BeforeSwapDelta.sol";
 import {Currency} from "v4-core/types/Currency.sol";
-import {IStylus} from "./interfaces/IStylus.sol";
+import {IFeeLogic} from "./interfaces/IFeeLogic.sol";
 
 contract LoyaltyPointsFeeHook is BaseHook {
     using LPFeeLibrary for uint24;
 
-    IStylus stylusContract;
+    IFeeLogic stylusContract;
 
     // Error if the pool is not using a dynamic fee
     error MustUseDynamicFee();
 
     // Initialize BaseHook parent contract in the constructor
     constructor(IPoolManager _poolManager, address _stylusContractAddress) BaseHook(_poolManager) {
-        stylusContract = IStylus(_stylusContractAddress);
+        stylusContract = IFeeLogic(_stylusContractAddress);
     }
 
     function getUserPoints(address user, address currency1) public view returns (uint256) {
@@ -63,8 +63,8 @@ contract LoyaltyPointsFeeHook is BaseHook {
     {
 
         address user = abi.decode(hookData, (address));
-        uint24 fee = stylusContract.getFee(user, Currency.unwrap(key.currency1));
-        uint24 feeWithFlag = fee | LPFeeLibrary.OVERRIDE_FEE_FLAG;
+        uint256 fee = stylusContract.getFee(user, Currency.unwrap(key.currency1));
+        uint24 feeWithFlag = uint24(fee) | LPFeeLibrary.OVERRIDE_FEE_FLAG;
         return (this.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, feeWithFlag);
     }
 
