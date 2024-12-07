@@ -64,7 +64,7 @@ contract FeeLogic is IFeeLogic {
         return baseFee;
     }
 
-    function updatePoints(address user, bool zeroForOne, int256 amountSpecified, int256 deltaAmount0, address currency0, address currency1) external {
+    function updatePoints(address user, bool zeroForOne,  int256 amountSpecified, int256 deltaAmount0, address currency0, address currency1) external {
         if (zeroForOne) {
             if (amountSpecified < 0) {
                 // token0 is being sold, amountSpecified is exact input
