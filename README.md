@@ -18,7 +18,13 @@ This hook is built on top of [Uniswap V4 Template](https://github.com/uniswapfou
     - `beforeSwap()` hook first checks the users most recent activity. If the user has been inactive too long, his points are reset. Then it calculates the fee with via the [implementation written in Stylus](https://github.com/arjanjohan/loyalty-points-fee-hook-stylus),
     - `afterSwap()` hook calculates the amount of points earned with the swap,
     - `getHookPermissions()` function.  
-2. The test template [LoyaltyPointsFeeHook.t.sol](test/LoyaltyPointsFeeHook.t.sol) preconfigures the v4 pool manager, test tokens, and test liquidity.
+2. The test template [LoyaltyPointsFeeHook.t.sol](test/LoyaltyPointsFeeHook.t.sol) preconfigures the v4 pool manager, test tokens, and test liquidity. Tests cover most of the scenarios:
+    - testNoPointsCollectedForERC20ToERC20Swap
+    - testPointsCollectedOnOneForZeroSwapExactInput
+    - testPointsCollectedOnOneForZeroSwapExactOutput
+    - testPointsCollectedOnZeroForOneSwapExactInput
+    - testPointsCollectedOnZeroForOneSwapExactOutput
+    - testPointsExpired
 3. [IFeeLogic.sol](src/interface/IFeeLogic.sol) is the interface for the [Stylus contract](https://github.com/arjanjohan/loyalty-points-fee-hook-stylus). I have also written an implementation of this in Solidity in [FeeLogic.sol](src/FeeLogic.sol).
 
 ## Next steps
